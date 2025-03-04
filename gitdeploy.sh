@@ -1,0 +1,69 @@
+#!/bin/bash
+
+# Define variables
+GITHUB_USER="vladimirovertheworld"
+GITHUB_REPO="picresizer"
+LOCAL_REPO_PATH="/home/vovkes/picresizer"
+SSH_PRIVATE_KEY="/home/vovkes/.ssh/id_ed25519"
+SSH_PUBLIC_KEY="/home/vovkes/.ssh/id_ed25519.pub"
+GIT_SSH_COMMAND="ssh -i $SSH_PRIVATE_KEY -o StrictHostKeyChecking=no"
+
+# Ensure the private SSH key exists
+if [ ! -f "$SSH_PRIVATE_KEY" ]; then
+    echo "Error: SSH private key not found at $SSH_PRIVATE_KEY"
+    exit 1
+fi
+
+# Ensure the local repository directory exists
+if [ ! -d "$LOCAL_REPO_PATH" ]; then
+    echo "Error: Directory $LOCAL_REPO_PATH does not exist."
+    exit 1
+fi
+
+# Navigate to the local repository path
+cd "$LOCAL_REPO_PATH" || { echo "Error: Unable to access directory $LOCAL_REPO_PATH."; exit 1; }
+
+# Check if it's a Git repository
+if [ ! -d ".git" ]; then
+    echo "Initializing a new Git repository..."
+    git init
+    git remote add origin git@github.com:$GITHUB_USER/$GITHUB_REPO.git
+fi
+
+# Verify remote repository URL
+REMOTE_URL=$(git remote get-url origin 2>/dev/null)
+if [[ "$REMOTE_URL" != "git@github.com:$GITHUB_USER/$GITHUB_REPO.git" ]]; then
+    echo "Error: The existing Git remote does not match the expected repository."
+    echo "Existing remote: $REMOTE_URL"
+    echo "Expected remote: git@github.com:$GITHUB_USER/$GITHUB_REPO.git"
+    exit 1
+fi
+
+# Ensure the main branch exists
+if ! git rev-parse --verify main >/dev/null 2>&1; then
+    echo "Creating 'main' branch..."
+    git checkout -b main
+fi
+
+# Configure Git
+git config user.name "$GITHUB_USER"
+git config user.email "vladimir@overtheworld.uk"
+
+# Add all files, commit, and push to GitHub
+git add .
+if git diff-index --quiet HEAD --; then
+    echo "No changes to commit."
+else
+    git commit -m "Automated commit and push from script"
+fi
+
+# Push changes with SSH authentication
+echo "Pushing to GitHub..."
+GIT_SSH_COMMAND="$GIT_SSH_COMMAND" git push -u origin main
+
+if [ $? -eq 0 ]; then
+    echo "Push completed successfully."
+else
+    echo "Error: Failed to push changes to GitHub."
+    exit 1
+fi
