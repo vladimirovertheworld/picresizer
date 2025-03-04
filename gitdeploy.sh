@@ -3,9 +3,8 @@
 # Define variables
 GITHUB_USER="vladimirovertheworld"
 GITHUB_REPO="picresizer"
-LOCAL_REPO_PATH="/home/vovkes/picresizer"
-SSH_PRIVATE_KEY="/home/vovkes/.ssh/id_ed25519"
-SSH_PUBLIC_KEY="/home/vovkes/.ssh/id_ed25519.pub"
+LOCAL_REPO_PATH="$HOME/picresizer"
+SSH_PRIVATE_KEY="$HOME/.ssh/id_ed25519"
 GIT_SSH_COMMAND="ssh -i $SSH_PRIVATE_KEY -o StrictHostKeyChecking=no"
 
 echo "Checking Git environment..."
@@ -33,34 +32,11 @@ else
     echo "Git Global Email: $GIT_EMAIL"
 fi
 
-# Check if SSH key exists
+# Ensure the SSH key exists
 if [ ! -f "$SSH_PRIVATE_KEY" ]; then
     echo "Error: SSH private key not found at $SSH_PRIVATE_KEY"
-    echo "Generate one using: ssh-keygen -t ed25519 -C \"your_email@example.com\""
     exit 1
 fi
-
-# Check if the SSH key is added to the SSH agent
-if ! ssh-add -l | grep -q "$SSH_PRIVATE_KEY"; then
-    echo "Adding SSH key to agent..."
-    eval "$(ssh-agent -s)"
-    ssh-add "$SSH_PRIVATE_KEY"
-fi
-
-# Test SSH connection to GitHub
-echo "Testing GitHub SSH authentication..."
-ssh -T git@github.com &>/dev/null
-if [ $? -eq 1 ]; then
-    echo "GitHub SSH authentication successful!"
-else
-    echo "Error: GitHub SSH authentication failed. Ensure your public key is added to your GitHub account."
-    echo "You can add it manually at: https://github.com/settings/keys"
-    exit 1
-fi
-
-echo "--------------------------------"
-echo "Git environment check completed!"
-echo "--------------------------------"
 
 # Ensure the local repository directory exists
 if [ ! -d "$LOCAL_REPO_PATH" ]; then
@@ -68,7 +44,7 @@ if [ ! -d "$LOCAL_REPO_PATH" ]; then
     exit 1
 fi
 
-# Navigate to the local repository path
+# Navigate to the correct repo directory
 cd "$LOCAL_REPO_PATH" || { echo "Error: Unable to access directory $LOCAL_REPO_PATH."; exit 1; }
 
 # Check if it's a Git repository
@@ -78,24 +54,42 @@ if [ ! -d ".git" ]; then
     git remote add origin git@github.com:$GITHUB_USER/$GITHUB_REPO.git
 fi
 
-# Verify remote repository URL
+# Verify the correct remote repository
 REMOTE_URL=$(git remote get-url origin 2>/dev/null)
-if [[ "$REMOTE_URL" != "git@github.com:$GITHUB_USER/$GITHUB_REPO.git" ]]; then
-    echo "Error: The existing Git remote does not match the expected repository."
-    echo "Existing remote: $REMOTE_URL"
-    echo "Expected remote: git@github.com:$GITHUB_USER/$GITHUB_REPO.git"
-    exit 1
+EXPECTED_URL="git@github.com:$GITHUB_USER/$GITHUB_REPO.git"
+if [[ "$REMOTE_URL" != "$EXPECTED_URL" ]]; then
+    echo "Fixing incorrect remote repository..."
+    git remote remove origin
+    git remote add origin "$EXPECTED_URL"
 fi
 
 # Ensure the main branch exists
 if ! git rev-parse --verify main >/dev/null 2>&1; then
     echo "Creating 'main' branch..."
     git checkout -b main
+else
+    git checkout main
 fi
 
 # Configure Git
 git config user.name "$GITHUB_USER"
 git config user.email "vladimir@overtheworld.uk"
+
+# Ensure SSH key is added to the agent
+if ! ssh-add -l | grep -q "$SSH_PRIVATE_KEY"; then
+    echo "Adding SSH key to agent..."
+    eval "$(ssh-agent -s)"
+    ssh-add "$SSH_PRIVATE_KEY"
+fi
+
+# Test SSH connection to GitHub
+echo "Testing GitHub SSH authentication..."
+ssh -T git@github.com
+if [ $? -ne 1 ]; then
+    echo "Error: GitHub SSH authentication failed. Ensure your SSH key is added to GitHub."
+    echo "You can add it manually at: https://github.com/settings/keys"
+    exit 1
+fi
 
 # Add all files, commit, and push to GitHub
 git add .
