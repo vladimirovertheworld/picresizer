@@ -8,59 +8,11 @@ SSH_PRIVATE_KEY="/home/vovkes/.ssh/id_ed25519"
 SSH_PUBLIC_KEY="/home/vovkes/.ssh/id_ed25519.pub"
 GIT_SSH_COMMAND="ssh -i $SSH_PRIVATE_KEY -o StrictHostKeyChecking=no"
 
-echo "Checking Git environment..."
-echo "--------------------------------"
-
-# Check if Git is installed
-if ! command -v git &>/dev/null; then
-    echo "Error: Git is not installed. Please install Git before proceeding."
-    exit 1
-fi
-
-# Display Git version
-echo "Git version: $(git --version)"
-
-# Check global Git username and email
-GIT_USER=$(git config --global user.name)
-GIT_EMAIL=$(git config --global user.email)
-if [[ -z "$GIT_USER" || -z "$GIT_EMAIL" ]]; then
-    echo "Warning: Git global username or email is not set."
-    echo "Set it using:"
-    echo "  git config --global user.name \"Your Name\""
-    echo "  git config --global user.email \"you@example.com\""
-else
-    echo "Git Global User: $GIT_USER"
-    echo "Git Global Email: $GIT_EMAIL"
-fi
-
-# Check if SSH key exists
+# Ensure the private SSH key exists
 if [ ! -f "$SSH_PRIVATE_KEY" ]; then
     echo "Error: SSH private key not found at $SSH_PRIVATE_KEY"
-    echo "Generate one using: ssh-keygen -t ed25519 -C \"your_email@example.com\""
     exit 1
 fi
-
-# Check if the SSH key is added to the SSH agent
-if ! ssh-add -l | grep -q "$SSH_PRIVATE_KEY"; then
-    echo "Adding SSH key to agent..."
-    eval "$(ssh-agent -s)"
-    ssh-add "$SSH_PRIVATE_KEY"
-fi
-
-# Test SSH connection to GitHub
-echo "Testing GitHub SSH authentication..."
-ssh -T git@github.com &>/dev/null
-if [ $? -eq 1 ]; then
-    echo "GitHub SSH authentication successful!"
-else
-    echo "Error: GitHub SSH authentication failed. Ensure your public key is added to your GitHub account."
-    echo "You can add it manually at: https://github.com/settings/keys"
-    exit 1
-fi
-
-echo "--------------------------------"
-echo "Git environment check completed!"
-echo "--------------------------------"
 
 # Ensure the local repository directory exists
 if [ ! -d "$LOCAL_REPO_PATH" ]; then
